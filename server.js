@@ -10,7 +10,7 @@ const { initializeSocket } = require('./api/middlewares/socket');
 require('dotenv').config();
 
 const app = express();
-const port = 3029;
+const port = 3000;
 
 connectDB();
 
