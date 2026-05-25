@@ -2,13 +2,18 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const UserSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name:        { type: String, required: true },
   designation: { type: String, required: true },
-  password: { type: String, required: true },
-  numberId: { type: String, required: false },
-  number: { type: String, required: false },
-  role: { type: String, enum: ['agent', 'admin'], default: 'agent' }
-}, {timestamps: true});
+  password:    { type: String, required: true },
+  numberId:    { type: String, required: false },
+  number:      { type: String, required: false },
+  role:        { type: String, enum: ['agent', 'admin'], default: 'agent' },
+}, { timestamps: true });
+
+// Indexes for CosmosDB
+UserSchema.index({ numberId: 1 });
+UserSchema.index({ role: 1 });
+UserSchema.index({ numberId: 1, role: 1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function (next) {

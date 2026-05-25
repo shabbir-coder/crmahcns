@@ -6,79 +6,6 @@ const { Contact , ContactAgent} = require('../models/contact.model');
 const { emitToInstance } = require('../middlewares/socket');
 const User = require('../models/users.model');
 
-// exports.getContact = async(req, res)=>{
-//     try {
-//       let query = {};
-//       const { page, limit, searchtext, filter} = req.query;
-//       const instanceId = req.user.instance_id;
-
-//       query = {instanceId};
-      
-//       if (searchtext) {
-//         query.$or = [
-//           { name: { $regex: new RegExp(searchtext, 'i') } },
-//           { number: { $regex: new RegExp(searchtext, 'i') } }
-//         ];
-//       }
-
-//       if(filter === 'pinned'){
-//         query.isPinned = true
-//       }
-      
-//       // const Contacts = await Contact.find(query)
-//       //   .skip((page - 1) * limit)
-//       //   .sort({updatedAt : -1})
-//       //   .limit(limit);
-
-//       const pipeline = [
-//         { $match: query },
-//         {
-//           $lookup: {
-//             from: "chats",
-//             localField: "number",
-//             foreignField: "number",
-//             let: { contactNumber: "$number" },
-//             pipeline: [
-//               {
-//                 $match: {
-//                   $expr: { $eq: ["$instanceId", instanceId] },
-//                   fromMe: false,
-//                 }
-//               },
-//               {
-//                 $count: "unreadMessages"
-//               }
-//             ],
-//             as: "unreadMessages"
-//           }
-//         },
-//         {
-//           $addFields: {
-//             unreadMessages: { $ifNull: [{ $arrayElemAt: ["$unreadMessages.unreadMessages", 0] }, 0] }
-//           }
-//         }
-//       ];
-
-//       if (filter === "unread") {
-//         pipeline.push({ $match: { unreadMessages: { $gt: 0 } } });
-//       }
-
-//       const totalContacts = await Contact.aggregate([...pipeline, { $count: "total" }]);
-//       const total = totalContacts.length > 0 ? totalContacts[0].total : 0;
-      
-//       pipeline.push({ $sort: { updatedAt: -1 } });
-//       pipeline.push({ $skip: (page - 1) * limit });
-//       pipeline.push({ $limit: parseInt(limit) });
-
-//       const contacts = await Contact.aggregate(pipeline);
-
-//       return res.status(200).json({data: contacts, total});
-
-//       } catch (error) {
-//         return res.status(500).send({ error: error.message });
-//       }
-// }
-
 exports.getContact = async (req, res) => {
   try {
     const { page = 1, limit = 10, searchtext, filter } = req.query;
@@ -90,42 +17,58 @@ exports.getContact = async (req, res) => {
       matchStage.isPinned = true;
     }
 
-
-console.log('matchStage', matchStage);
+    console.log('matchStage', matchStage);
 
     const pipeline = [
-      { $match: matchStage }, // Match contacts assigned to the agent
+      { $match: matchStage },
+      // CosmosDB-compatible $lookup — no 'let' or sub-pipeline
       {
         $lookup: {
           from: "messages",
           localField: "number",
           foreignField: "number",
-          let: { contactNumber: "$number" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$numberId", numberId] },
-                fromMe: false
-              }
-            },
-            {
-              $addFields: {
-                isUnread: {
-                  $not: {
-                    $in: ["4", "$messageStatus.status"] // Check if status 4 (read) is NOT in the array
-                  }
-                }
-              }
-            },
-            { $match: { isUnread: true } }, // Keep only unread messages
-            { $count: "unreadMessages" } // Count unread messages per contact
-          ],
           as: "unreadMessages"
+        }
+      },
+      // Filter the looked-up messages in memory using $filter (CosmosDB safe)
+      {
+        $addFields: {
+          unreadMessages: {
+            $filter: {
+              input: "$unreadMessages",
+              as: "msg",
+              cond: {
+                $and: [
+                  { $eq: ["$$msg.numberId", numberId] },
+                  { $eq: ["$$msg.fromMe", false] },
+                  {
+                    $not: {
+                      $in: [
+                        "4",
+                        {
+                          $ifNull: [
+                            {
+                              $map: {
+                                input: { $ifNull: ["$$msg.messageStatus", []] },
+                                as: "s",
+                                in: "$$s.status"
+                              }
+                            },
+                            []
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
         }
       },
       {
         $addFields: {
-          unreadMessages: { $ifNull: [{ $arrayElemAt: ["$unreadMessages.unreadMessages", 0] }, 0] }
+          unreadMessages: { $size: { $ifNull: ["$unreadMessages", []] } }
         }
       },
       {
@@ -165,10 +108,10 @@ console.log('matchStage', matchStage);
     const total = totalContacts.length > 0 ? totalContacts[0].total : 0;
 
     pipeline.push({ $sort: { lastMessageAt: -1 } });
-    pipeline.push({ $skip: (page - 1) * limit });
+    pipeline.push({ $skip: (parseInt(page) - 1) * parseInt(limit) });
     pipeline.push({ $limit: parseInt(limit) });
 
-    console.log('pipeline', pipeline)
+    console.log('pipeline', JSON.stringify(pipeline, null, 2));
     const contacts = await Contact.aggregate(pipeline);
 
     return res.status(200).json({ data: contacts, total });
@@ -213,11 +156,9 @@ exports.saveContact = async(req, res)=>{
               role: 'admin'
           });
       } else if (user.role === 'agent') {
-          // Find admin for the same instance
-          const adminUser = await User.findOne({ instanceId, role: 'admin' });
+          const adminUser = await User.findOne({ numberId, role: 'admin' });
 
           if (adminUser) {
-              // Create ContactAgent for agent
               await ContactAgent.create({
                   contactId: newContact._id,
                   agentId: userId,
@@ -225,7 +166,6 @@ exports.saveContact = async(req, res)=>{
                   role: 'agent'
               });
 
-              // Create ContactAgent for admin
               await ContactAgent.create({
                   contactId: newContact._id,
                   agentId: adminUser._id,
@@ -238,7 +178,6 @@ exports.saveContact = async(req, res)=>{
         return res.status(201).send({ message: 'Contact created', contact: newContact });
 
       } catch (error) {
-        // console.log(error)
         return res.status(500).send({ error: error.message });
       }
 }
@@ -252,7 +191,6 @@ exports.updateContacts = async(req, res)=>{
         }
         res.status(200).send(contact);
       } catch (error) {
-        // console.log(error)
         return res.status(500).send({ error: error.message });
       }
 }
@@ -264,7 +202,7 @@ exports.deleteContact = async (req, res) => {
         if (!contact) {
             return res.status(404).json({ message: "Contact not found" });
         }
-        await Message.deleteMany({ number: contact.number, numberId: contact.instanceId });
+        await Message.deleteMany({ number: contact.number, numberId: contact.numberId });
         await Contact.findByIdAndDelete(id);
 
         res.status(200).json({ message: "Contact and related messages deleted successfully" });
@@ -293,104 +231,14 @@ exports.getMessages = async (req, res)=>{
          })
         res.status(200).send({messages,count});
       } catch (error) {
-        // console.log(error)
         return res.status(500).send({ error: error.message });
       }
-}
-
-exports.sendMessageOld = async(req, res)=>{
-try {
-    const { number, message, type, media_url } = req.body;
-    const numberId = req.user.numberId
-    const userId = req.user.userId
-    if (!number || !(message || media_url)) {
-        return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const messageData = {
-        number,
-        numberId: numberId,
-        message,
-        type: "text"
-    };
-
-    if(media_url){
-      messageData['type'] = type
-      messageData['media_url']= media_url
-    }
-
-    console.log('messageData', messageData)
-    const API_URL = process.env.LOGIN_CB_API
-
-    const response = await axios.get(`${API_URL}/send`, {
-        params: { ...messageData, access_token: ACCESS_TOKEN },
-    });
-
-    console.log('response', response.data)
-    
-    if (response.data.status !== "success") {
-        return res.status(500).json({ error: "Failed to send message", details: response.data });
-    }
-    let messageId= response.data?.message?.key?.id
-    
-    // const newChat = new Message({
-    //     number,
-    //     fromMe: true,
-    //     instanceId,
-    //     messageStatus: [{ status: 1, time: new Date() }],
-    //     message,
-    //     type: type || "text",
-    //     timeStamp: new Date(),
-    //     mediaUrl: media_url || "",
-    //     messageId: response.data?.message?.key?.id || "",
-    // });
-    
-    const newMessage = await Message.findOneAndUpdate(
-            {messageId},
-            { 
-                $set: {
-                    number,
-                    fromMe: true,
-                    instanceId,
-                    message,
-                    messageStatus: [{ status: 1, time: new Date() }],
-                    type: type || "text",
-                    mediaUrl: media_url || "",
-                    sentBy: req.user.role,
-                    sendByName: req.user.name,
-                    sentById: userId
-                }
-            },
-            { new: true, upsert: true }
-        ); 
-//     await newChat.save();
-
-    // console.log(number)
-
-    // const contact = await Contact.findOneAndUpdate(
-    //     { number , instanceId},
-    //     {
-    //       $set: {
-    //         lastMessage: message,
-    //         lastMessageAt: new Date(),
-    //         updatedAt: new Date()
-    //       }
-    //     },
-    //     { new: true, upsert: true }
-    //   );
-
-    //   console.log(contact)
-    return res.status(200).json({ success: true, message: "Message sent successfully"});
-    } catch (error) {
-    console.error("Error sending message:", error);
-    return res.status(500).json({ error: "Internal Server Error", details: error.message });
-    }
 }
 
 exports.sendMessage = async (req, res) => {
   try {
     const { number, message, type = "text", media_url, caption, filename } = req.body;
-    const numberId = req.user.numberId; // phone_number_id from Instance
+    const numberId = req.user.numberId;
     const userId = req.user.userId;
     
     const instance = await Instance.findOne({numberId})
@@ -399,7 +247,6 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Build payload for WhatsApp Cloud API
     let payload = {
       messaging_product: "whatsapp",
       to: number,
@@ -422,7 +269,6 @@ exports.sendMessage = async (req, res) => {
 
     console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
 
-    // Call WhatsApp Cloud API
     const response = await axios.post(
       `${process.env.FB_API}/${numberId}/messages`,
       payload,
@@ -513,29 +359,29 @@ exports.sendMessage = async (req, res) => {
 exports.markMessagesAsRead = async (req, res) => {
   try {
     const { number } = req.body;
-    const instanceId = req.user.instanceId; // Assuming authentication middleware sets user instance ID
+    const numberId = req.user.numberId;
 
     if (!number) {
       return res.status(400).json({ error: "Number is required" });
     }
 
-    const filter = {
+    const filterQuery = {
       number,
-      instanceId,
+      numberId,
       fromMe: false,
-      "messageStatus.status": { $ne: "4" } // Find messages where status ≠ '4'
+      "messageStatus.status": { $ne: "4" }
     };
 
     const update = {
       $push: {
         messageStatus: {
           status: "4",
-          time: new Date() // Add current timestamp
+          time: new Date()
         }
       }
     };
 
-    const result = await Message.updateMany(filter, update);
+    const result = await Message.updateMany(filterQuery, update);
 
     return res.status(200).json({
       message: "Messages marked as read",
@@ -682,34 +528,3 @@ exports.togglePinContact = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
-
-const sendMessageFunc = async (message, data={})=>{
-console.log(message)
-const instance = await Instance.findOne({
-    instance_id: message.instance_id
-}).sort({ updatedAt: -1 })
-
-const contact = await Contact.findOne({number: message.number, eventId: instance?.eventId.toString()});
-message.message = reformText(message?.message, {contact})
-
-const url = process.env.LOGIN_CB_API
-const access_token = process.env.ACCESS_TOKEN_CB
-if(message?.media_url){
-    const newMessage = {
-    ...message,
-    senderNumber: message?.number,
-    instanceId: message?.instance_id,
-    fromMe: true,
-    text: message?.message,
-    media_url: message?.media_url,
-    eventId: instance?.eventId
-    }
-    const savedMessage = new Message(newMessage);
-    await savedMessage.save();
-}
-
-// console.log('aaaa',newMessage)
-
-const response = await axios.get(`${url}/send`,{params:{...message,access_token}})
-return true;
-}
