@@ -11,7 +11,7 @@ exports.getContact = async (req, res) => {
     const { page = 1, limit = 10, searchtext, filter } = req.query;
     const {numberId, userId} = req.user;
     const agentId = new mongoose.Types.ObjectId(userId)
-    let matchStage;
+    let matchStage = { numberId };
 
     if (filter === "pinned") {
       matchStage.isPinned = true;
