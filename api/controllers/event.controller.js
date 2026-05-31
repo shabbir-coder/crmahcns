@@ -231,16 +231,7 @@ const handleMessageUpsert = async (message, numberId) => {
     // ================================
     // SEND RESPONSE BACK TO WHATSAPP
     // ================================
-    if (data.response_type === "text") {
-      await sendMessage(number, data.response, numberId);
-    }
-
-    if (data.response_type === "audio" && data.audio_url) {
-      await sendMediaMessage(number, {
-        type: "audio",
-        link: data.audio_url,
-      }, numberId);
-    }
+    await sendMessage(number, data.response, numberId);
 
     // If image URLs are returned
     if (data.image_urls?.length) {
