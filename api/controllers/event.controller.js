@@ -175,8 +175,20 @@ const handleMessageUpsert = async (message, numberId) => {
     // PREPARE LLM PAYLOAD (JSON BODY)
     // ================================
     const payload = {
+      user_message: textMessage || locationUrl || "",
+      chatbot_id: number,
       phone_number: number,
-      user_name: pushName,
+      business_info: {
+        name: "Alhutaib Computers",
+        description: "",
+        working_hours: "9AM - 6PM",
+        working_days: "Monday - Saturday",
+      },
+      chatbot_info: {
+        tone: "Professional",
+        language: "english",
+        name: "",
+      },
     };
 
     if (fileData) {
@@ -191,8 +203,6 @@ const handleMessageUpsert = async (message, numberId) => {
       }
 
       payload.file_path = fileData.url;
-    } else {
-      payload.message = textMessage || locationUrl;
     }
 
     console.log("📤 Sending to AI:", payload);
@@ -202,7 +212,7 @@ const handleMessageUpsert = async (message, numberId) => {
     // ================================
     try {
       aiResponse = await axios.post(
-        `${process.env.LLM_API}/chat`,
+        `${process.env.LLM_API}/api/v1/chat`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       );
