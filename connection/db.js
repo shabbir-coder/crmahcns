@@ -10,10 +10,28 @@ const User = require('../api/models/users.model');
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
-    await mongoose.connect(mongoURI, {
-      retryWrites: false,   // CosmosDB does not support retryWrites
-      tls: true,            // Required for CosmosDB
-    });
+
+    const options = {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      family: 4
+    };
+
+    const conn = await mongoose.connect(
+      process.env.MONGODB_URI,
+      options
+    );
+
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`📊 Database: ${conn.connection.name}`);
+    console.log(
+      `🔌 Connection State: ${
+        conn.connection.readyState === 1
+          ? 'Connected'
+          : 'Disconnected'
+      }`
+    );
+
     console.log('✅ Connected to CosmosDB via Mongoose');
 
     // Sync indexes after connection
