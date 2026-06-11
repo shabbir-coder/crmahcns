@@ -8,7 +8,6 @@ const axios = require('axios');
 
 exports.handleEvent= async(req,res)=>{
     try {
-        console.log(instance_id, data);
         const { instance_id, data } = req.body;
         if (!data || !data.event) return res.status(400).send({ error: 'Invalid request' });
         const io = req.io;
@@ -34,7 +33,6 @@ exports.handleEvent= async(req,res)=>{
 // Function to handle new contacts update
 const handleContactUpdate = async (contacts, instanceId) => {
     if (!Array.isArray(contacts)) return;
-    console.log('contact.update')
     for (const contact of contacts) {
         const { id, notify } = contact;
         const number = id.replace('@s.whatsapp.net', ''); 
@@ -76,7 +74,6 @@ const handleMessageUpsert = async (message, numberId) => {
     if (["image", "video", "audio", "document", "sticker"].includes(type)) {
       try {
         fileData = await saveFileData(message);
-        console.log("fileData", fileData);
       } catch (err) {
         console.error("❌ Error saving media file:", err);
       }
@@ -179,7 +176,7 @@ const handleMessageUpsert = async (message, numberId) => {
       chatbot_id: number,
       phone_number: number,
       business_info: {
-        name: "Alhutaib Computers",
+        name: "Al Hutaib Computers & Network Solutions LLC",
         description: "",
         working_hours: "9AM - 6PM",
         working_days: "Monday - Saturday",
@@ -382,7 +379,6 @@ const saveFileData = async (message) => {
       return null;
     }
 
-    console.log('file message', message)
     const mediaId = media.id;
     const accessToken = process.env.WHATSAPP_TOKEN;
 
@@ -454,16 +450,11 @@ exports.getEventWebhook = async (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-console.log('req', req)
   const VERIFY_TOKEN = process.env.WP_VERIFY_TOKEN; 
-console.log('VERIFY_TOKEN', VERIFY_TOKEN)
   // Check if a token and mode were sent
   if (mode && token) {
     // Check the mode and token sent are correct
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      // Respond with the challenge token from the request
-      console.log('Webhook verified successfully!');
-      console.log('gere')
       return res.status(200).send(challenge);
     } else {
       // Respond with '403 Forbidden' if verify tokens do not match

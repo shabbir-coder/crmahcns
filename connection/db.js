@@ -22,18 +22,6 @@ const connectDB = async () => {
       options
     );
 
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    console.log(`📊 Database: ${conn.connection.name}`);
-    console.log(
-      `🔌 Connection State: ${
-        conn.connection.readyState === 1
-          ? 'Connected'
-          : 'Disconnected'
-      }`
-    );
-
-    console.log('✅ Connected to CosmosDB via Mongoose');
-
     // Sync indexes after connection
     await syncAllIndexes();
   } catch (error) {
@@ -70,12 +58,7 @@ async function syncAllIndexes() {
   const successful = results.filter(r => r.status === 'success').length;
   const failed     = results.filter(r => r.status === 'failed').length;
 
-  console.log('\n📊 Index Sync Summary:');
-  console.log(`   ✅ Successful: ${successful}/${models.length}`);
-  console.log(`   ❌ Failed:     ${failed}/${models.length}`);
-
   if (failed > 0) {
-    console.log('\n⚠️  Failed models:');
     results
       .filter(r => r.status === 'failed')
       .forEach(r => console.log(`   - ${r.model}: ${r.error}`));

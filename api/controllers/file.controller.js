@@ -86,7 +86,6 @@ exports.downloadAndDecryptMedia = async (req, res) => {
         const savePath = path.join(uploadDir, filename);
 
         fs.writeFileSync(savePath, mediaData);
-        console.log(`File saved: ${savePath}`);
         
         // Step 5: Return URL
         const baseUrl = `${req.protocol}://${req.get('host')}`;

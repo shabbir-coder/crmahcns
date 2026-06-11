@@ -14,7 +14,6 @@ let io;
 const connectedClients = {}; // Store active clients { instanceId: socketId }
 
 const initializeSocket = (server) => {
-    console.log('server', server)
     io = new Server(server, {
         cors: {
             origin: "*",
@@ -23,7 +22,6 @@ const initializeSocket = (server) => {
         path: "/socket.io"
     });
     
-    console.log('io', io)
 
     io.on("connection", async (socket) => {
         console.log("A user connected:", socket.id);
@@ -54,7 +52,6 @@ const initializeSocket = (server) => {
         }
 
         socket.on("registerInstance", async ({ mongoId }) => {
-            console.log(`Registering instance: ${mongoId}`);
 
             try {
                 let existingSession = await SocketSession.findOne({ mongoId });
@@ -110,7 +107,6 @@ const initializeSocket = (server) => {
 const emitToInstance = async (mongoId, eventName, data) => {
     try {
         const session = await SocketSession.findOne({ mongoId });
-        console.log('session', session);
         if (session) {
             io.to(session.socketId).emit(eventName, data);
         } else {

@@ -17,8 +17,6 @@ exports.getContact = async (req, res) => {
       matchStage.isPinned = true;
     }
 
-    console.log('matchStage', matchStage);
-
     const pipeline = [
       { $match: matchStage },
       // CosmosDB-compatible $lookup — no 'let' or sub-pipeline
@@ -111,7 +109,6 @@ exports.getContact = async (req, res) => {
     pipeline.push({ $skip: (parseInt(page) - 1) * parseInt(limit) });
     pipeline.push({ $limit: parseInt(limit) });
 
-    console.log('pipeline', JSON.stringify(pipeline, null, 2));
     const contacts = await Contact.aggregate(pipeline);
 
     return res.status(200).json({ data: contacts, total });
@@ -123,7 +120,6 @@ exports.getContact = async (req, res) => {
 
 exports.saveContact = async(req, res)=>{
     try {
-        console.log(req.user)
         const numberId = req.user.numberId;
         const userId = req.user.userId;
         const user = req.user;
@@ -459,7 +455,6 @@ exports.getAssignedUser = async (req, res)=>{
   try {
     const { contactId } = req.params;
     const numberId = req.user.numberId;
-    console.log(req.user)
 
     if (!mongoose.Types.ObjectId.isValid(contactId)) {
       return res.status(400).json({ error: "Invalid contactId" });
