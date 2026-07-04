@@ -173,7 +173,7 @@ const handleMessageUpsert = async (message, numberId) => {
     // ================================
     const payload = {
       phone_number: number,
-      user_name: contactName || "", // replace `contactName` with whatever variable holds the sender's name in this scope
+      user_name: pushName || number, // replace `contactName` with whatever variable holds the sender's name in this scope
       user_message: textMessage || locationUrl || "",
       is_file: false,
       file_type: "",
