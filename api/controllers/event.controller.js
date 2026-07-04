@@ -172,21 +172,14 @@ const handleMessageUpsert = async (message, numberId) => {
     // PREPARE LLM PAYLOAD (JSON BODY)
     // ================================
     const payload = {
-      user_message: textMessage || locationUrl || "",
-      chatbot_id: number,
       phone_number: number,
-      business_info: {
-        name: "Al Hutaib Computers & Network Solutions LLC",
-        description: "",
-        working_hours: "9AM - 6PM",
-        working_days: "Monday - Saturday",
-      },
-      chatbot_info: {
-        tone: "Professional",
-        language: "english",
-        name: "",
-      },
+      user_name: contactName || "", // replace `contactName` with whatever variable holds the sender's name in this scope
+      user_message: textMessage || locationUrl || "",
+      is_file: false,
+      file_type: "",
+      file_path: "",
     };
+
 
     if (fileData) {
       payload.is_file = true;
